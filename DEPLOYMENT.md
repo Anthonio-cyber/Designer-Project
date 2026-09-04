@@ -58,6 +58,52 @@ docker run --rm -v studio-data:/data -v "$PWD:/backup" alpine \
   tar czf /backup/studio-backup-$(date +%F).tar.gz -C /data .
 ```
 
+## Currently deployed
+
+| | |
+| --- | --- |
+| URL | <https://designer-platform-03dt.onrender.com> |
+| Service | `designer-platform` (Render, Frankfurt) |
+| Runtime | Node 22, built with `npm ci && npm run build` |
+| Branch | `claude/designer-portfolio-platform-wcsbam`, auto-deploys on push |
+| Plan | Free |
+
+> **If you deploy this as a Node service anywhere else, set
+> `NPM_CONFIG_INCLUDE=dev`.** Render (like most hosts) exports
+> `NODE_ENV=production` to the *build* step, and npm then defaults `omit` to
+> `dev` — stripping TypeScript and every `@types` package the build needs, so
+> the build fails on missing types rather than on real errors. Setting that one
+> variable puts them back.
+>
+> Do not fix this with `include=dev` in `.npmrc`: `include` outranks `omit` even
+> when `--omit=dev` is passed explicitly, which would push dev dependencies into
+> the production image. The Docker path never had the problem — its build stage
+> sets no `NODE_ENV`, then prunes explicitly.
+
+**Two consequences of the free plan, both fixed by upgrading:**
+
+1. **It sleeps.** After ~15 minutes idle the instance spins down, and the next
+   visit waits ~40–60 seconds for it to wake. This is a property of the plan;
+   no application change can avoid it.
+2. **Storage is ephemeral.** Free instances cannot have a disk, so the SQLite
+   database and every uploaded file are wiped on each deploy and restart.
+   Portfolio projects, clients, messages and invoices do not survive.
+
+To fix both — Render dashboard → the service:
+
+1. **Settings → Instance Type → Starter** ($7/mo). The service stops sleeping.
+2. **Disks → Add Disk**, name `studio-data`, mount path `/var/data`, 5 GB
+   (+$1.25/mo).
+3. **Environment**, add:
+   ```
+   DATA_DIR=/var/data/db
+   UPLOAD_DIR=/var/data/uploads
+   ```
+4. Save. The service redeploys and data now persists.
+
+Alternatively delete the service and use the blueprint below, which sets all of
+that up in one step.
+
 ## Option 2 — Render (simplest managed path)
 
 `render.yaml` is a ready blueprint: **New → Blueprint → pick this repo.** It
