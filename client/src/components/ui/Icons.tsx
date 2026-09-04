@@ -123,6 +123,21 @@ export const Icon = {
   undo: (p: IconProps) => (
     <svg {...base} {...p}><path d="M4 9h11a5 5 0 0 1 0 10H9" /><path d="m8 5-4 4 4 4" /></svg>
   ),
+  card: (p: IconProps) => (
+    <svg {...base} {...p}><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /><path d="M6 14.5h3" /></svg>
+  ),
+  plug: (p: IconProps) => (
+    <svg {...base} {...p}><path d="M9 3v6M15 3v6" /><path d="M6 9h12v3a6 6 0 0 1-12 0Z" /><path d="M12 18v3" /></svg>
+  ),
+  mail: (p: IconProps) => (
+    <svg {...base} {...p}><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="m3.5 7 8.5 6 8.5-6" /></svg>
+  ),
+  external: (p: IconProps) => (
+    <svg {...base} {...p}><path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
+  ),
+  copy: (p: IconProps) => (
+    <svg {...base} {...p}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H5a1 1 0 0 0-1 1v8.5A1.5 1.5 0 0 0 5.5 15" /></svg>
+  ),
   megaphone: (p: IconProps) => (
     <svg {...base} {...p}><path d="M4 10v4a2 2 0 0 0 2 2h2l8 4V4L8 8H6a2 2 0 0 0-2 2Z" /><path d="M19 9.5a3 3 0 0 1 0 5" /></svg>
   ),

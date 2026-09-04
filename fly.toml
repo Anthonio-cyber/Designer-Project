@@ -1,0 +1,40 @@
+# Fly.io deployment.  fly launch --no-deploy  then  fly deploy
+# Replace the app name and primary_region with your own.
+app = "designer-platform"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+  DATA_DIR = "/data/db"
+  UPLOAD_DIR = "/data/uploads"
+  COOKIE_SECURE = "true"
+
+# Secrets are set with: fly secrets set JWT_ACCESS_SECRET=… RESEND_API_KEY=… etc.
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # SQLite lives on one volume, so exactly one machine may write to it.
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/health"
+
+# Create with: fly volumes create studio_data --size 5 --region lhr
+[[mounts]]
+  source = "studio_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

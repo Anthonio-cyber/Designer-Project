@@ -12,6 +12,7 @@ import { notify, notifyAdmins } from '../services/notifications.service.js';
 import { track } from '../services/analytics.service.js';
 import { publicUrl, recordFile, upload } from '../services/storage.service.js';
 import { ensureConversationForClient } from '../services/messaging.service.js';
+import { adminRecipients, sendEmailAsync, templates } from '../services/email/index.js';
 
 export const requestsRouter = Router();
 
@@ -109,6 +110,25 @@ requestsRouter.post(
       body: input.description.slice(0, 140),
       link: `/admin/requests/${id}`,
     });
+    for (const admin of adminRecipients()) {
+      sendEmailAsync({
+        to: admin.email,
+        template: 'new-request',
+        notifyKey: 'newRequest',
+        // Replying to the alert reaches the person who sent the brief.
+        replyTo: input.email,
+        email: templates.newRequest({
+          name: input.name,
+          email: input.email,
+          projectType: input.projectType,
+          budget: input.budgetRange,
+          deadline: input.deadline,
+          description: input.description,
+          requestId: id,
+        }),
+      });
+    }
+
     logActivity({
       actorId: userId,
       actorType: userId ? 'client' : 'visitor',

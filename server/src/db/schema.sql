@@ -358,3 +358,61 @@ CREATE TABLE IF NOT EXISTS analytics_events (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_unique
   ON analytics_events (type, COALESCE(entity_id, ''), day);
+
+-- ---------------------------------------------------------------- payments ---
+-- Money is stored in minor units (cents/kobo) as integers so no total is ever
+-- subject to floating-point drift.
+CREATE TABLE IF NOT EXISTS invoices (
+  id             TEXT PRIMARY KEY,
+  number         TEXT NOT NULL UNIQUE,
+  client_id      TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  project_id     TEXT REFERENCES client_projects (id) ON DELETE SET NULL,
+  service_id     TEXT REFERENCES services (id) ON DELETE SET NULL,
+  title          TEXT NOT NULL,
+  description    TEXT,
+  amount_minor   INTEGER NOT NULL,
+  currency       TEXT NOT NULL DEFAULT 'USD',
+  method         TEXT NOT NULL DEFAULT 'stripe'
+                 CHECK (method IN ('stripe', 'paystack', 'bank_transfer', 'other')),
+  status         TEXT NOT NULL DEFAULT 'draft'
+                 CHECK (status IN ('draft', 'sent', 'paid', 'cancelled', 'refunded')),
+  due_date       TEXT,
+  notes          TEXT,
+  provider_ref   TEXT,
+  checkout_url   TEXT,
+  checkout_expires_at TEXT,
+  paid_at        TEXT,
+  paid_method    TEXT,
+  marked_paid_by TEXT REFERENCES users (id) ON DELETE SET NULL,
+  sent_at        TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_invoices_client ON invoices (client_id, status);
+CREATE INDEX IF NOT EXISTS idx_invoices_project ON invoices (project_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_ref ON invoices (provider_ref);
+
+-- Raw provider events, kept so a replayed or duplicated webhook is a no-op.
+CREATE TABLE IF NOT EXISTS payment_events (
+  id          TEXT PRIMARY KEY,
+  provider    TEXT NOT NULL,
+  event_id    TEXT NOT NULL,
+  event_type  TEXT NOT NULL,
+  invoice_id  TEXT REFERENCES invoices (id) ON DELETE SET NULL,
+  payload     TEXT NOT NULL DEFAULT '{}',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_events_unique ON payment_events (provider, event_id);
+
+-- ------------------------------------------------------------------- email ---
+CREATE TABLE IF NOT EXISTS email_log (
+  id          TEXT PRIMARY KEY,
+  to_email    TEXT NOT NULL,
+  subject     TEXT NOT NULL,
+  template    TEXT NOT NULL,
+  provider    TEXT NOT NULL,
+  status      TEXT NOT NULL CHECK (status IN ('sent', 'failed', 'skipped')),
+  error       TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_email_log_created ON email_log (created_at);

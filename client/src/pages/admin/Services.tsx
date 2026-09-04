@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
-import { formatMoney } from '@/lib/format';
+import { useSettings } from '@/context/SettingsContext';
+import { cn } from '@/lib/cn';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Checkbox, Field, Input, Textarea } from '@/components/ui/Field';
 import { Badge, Card, EmptyState, Modal, Skeleton } from '@/components/ui/Primitives';
 import { Icon } from '@/components/ui/Icons';
-import type { Service } from '@/lib/types';
+import type { PriceMode, Service } from '@/lib/types';
 
 export default function AdminServices() {
   const { success, error: toastError } = useToast();
@@ -90,9 +91,13 @@ export default function AdminServices() {
                 <p className="mt-2 line-clamp-3 flex-1 text-sm text-ink-muted">{service.description}</p>
               )}
               <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-xs">
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-2">
                   <dt className="text-ink-faint">Price</dt>
-                  <dd className="text-ink">{service.priceLabel ?? formatMoney(service.priceFrom)}</dd>
+                  <dd className="flex items-center gap-1.5 text-ink">
+                    {service.priceDisplay}
+                    {service.priceMode === 'fixed' && <Badge tone="success">fixed</Badge>}
+                    {service.priceMode === 'custom' && <Badge tone="neutral">quote</Badge>}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-ink-faint">Delivery</dt>
@@ -166,9 +171,22 @@ function ServiceModal({
   onSaved: () => void;
 }) {
   const { error: toastError } = useToast();
+  const { settings: site } = useSettings();
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const service = target === 'new' ? null : target;
+  const [mode, setMode] = useState<PriceMode>('from');
+  const [amount, setAmount] = useState('');
+
+  // Reset the controlled pricing fields whenever a different service is opened.
+  useEffect(() => {
+    if (!target) return;
+    const next = service?.priceMode ?? 'from';
+    setMode(next);
+    setAmount(String((next === 'fixed' ? service?.priceFixed : service?.priceFrom) ?? ''));
+  }, [target, service]);
+
+  const currency = service?.currency ?? site?.currency ?? 'USD';
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -176,12 +194,17 @@ function ServiceModal({
     setSubmitting(true);
     setErrors({});
 
-    const priceValue = String(form.get('priceFrom') ?? '').trim();
+    const value = amount.trim() ? Number(amount) : null;
     const payload = {
       name: String(form.get('name') ?? ''),
       description: String(form.get('description') ?? '') || null,
-      priceFrom: priceValue ? Number(priceValue) : null,
+      priceMode: mode,
+      // Only the field this mode uses is sent, so switching modes never leaves
+      // a stale price behind.
+      priceFixed: mode === 'fixed' ? value : null,
+      priceFrom: mode === 'from' ? value : null,
       priceLabel: String(form.get('priceLabel') ?? '') || null,
+      currency: String(form.get('currency') ?? currency).toUpperCase(),
       deliveryTime: String(form.get('deliveryTime') ?? '') || null,
       position: Number(form.get('position') ?? 99),
       active: form.get('active') === 'on',
@@ -201,6 +224,12 @@ function ServiceModal({
     }
   };
 
+  const MODES: { value: PriceMode; label: string; hint: string }[] = [
+    { value: 'fixed', label: 'Fixed price', hint: 'One set price. You can invoice for it straight away.' },
+    { value: 'from', label: 'Starting from', hint: 'A published starting point, quoted properly after a brief.' },
+    { value: 'custom', label: 'Custom quote', hint: 'No public price. You quote, then invoice by card or transfer.' },
+  ];
+
   return (
     <Modal open={!!target} onClose={onClose} title={service ? 'Edit service' : 'Add service'}>
       {target && (
@@ -208,6 +237,7 @@ function ServiceModal({
           <Field label="Name" required htmlFor="service-name" error={errors.name}>
             <Input id="service-name" name="name" required maxLength={80} defaultValue={service?.name ?? ''} />
           </Field>
+
           <Field label="Description" htmlFor="service-description">
             <Textarea
               id="service-description"
@@ -217,20 +247,77 @@ function ServiceModal({
               defaultValue={service?.description ?? ''}
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Starting price" htmlFor="service-price" hint="Numbers only. Leave blank for “contact for pricing”.">
+
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-medium text-ink">Pricing</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {MODES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setMode(option.value)}
+                  aria-pressed={mode === option.value}
+                  className={cn(
+                    'rounded-xl border p-3 text-left transition',
+                    mode === option.value
+                      ? 'border-accent bg-accent/6 ring-1 ring-accent/30'
+                      : 'border-line hover:border-accent/50',
+                  )}
+                >
+                  <span className={cn('block text-sm font-medium', mode === option.value ? 'text-accent' : 'text-ink')}>
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-[11px] leading-snug text-ink-muted">{option.hint}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            {mode !== 'custom' && (
+              <Field
+                label={mode === 'fixed' ? 'Price' : 'Starting price'}
+                htmlFor="service-amount"
+                hint="Numbers only."
+              >
+                <Input
+                  id="service-amount"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  placeholder="350"
+                />
+              </Field>
+            )}
+            <Field label="Currency" htmlFor="service-currency">
               <Input
-                id="service-price"
-                name="priceFrom"
-                type="number"
-                min={0}
-                step={1}
-                defaultValue={service?.priceFrom ?? ''}
+                id="service-currency"
+                name="currency"
+                maxLength={3}
+                defaultValue={currency}
+                className="uppercase"
               />
             </Field>
-            <Field label="Price label" htmlFor="service-price-label" hint="Overrides the number, e.g. “From £350”.">
+            <Field
+              label="Price label"
+              htmlFor="service-price-label"
+              hint="Overrides the generated text, e.g. “From £350 + VAT”."
+            >
               <Input id="service-price-label" name="priceLabel" maxLength={60} defaultValue={service?.priceLabel ?? ''} />
             </Field>
+          </div>
+
+          {mode === 'custom' && (
+            <p className="rounded-xl bg-surface-sunken p-3.5 text-xs text-ink-muted">
+              The public page will read “Contact for pricing”. Once you agree a figure, raise an invoice from{' '}
+              <span className="font-medium text-ink">Invoices</span> — card payment or your bank account details,
+              chosen per invoice.
+            </p>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Delivery time" htmlFor="service-delivery">
               <Input
                 id="service-delivery"
@@ -241,14 +328,23 @@ function ServiceModal({
               />
             </Field>
             <Field label="Sort position" htmlFor="service-position">
-              <Input id="service-position" name="position" type="number" min={0} max={999} defaultValue={service?.position ?? 99} />
+              <Input
+                id="service-position"
+                name="position"
+                type="number"
+                min={0}
+                max={999}
+                defaultValue={service?.position ?? 99}
+              />
             </Field>
           </div>
+
           <Checkbox
             name="active"
             label="Show on the public services page"
             defaultChecked={service ? service.active : true}
           />
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel

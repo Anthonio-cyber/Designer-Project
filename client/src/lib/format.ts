@@ -33,14 +33,36 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
-export function formatMoney(value?: number | null): string {
+export function formatMoney(value?: number | null, currency = 'USD'): string {
   if (value === null || value === undefined) return 'Contact for pricing';
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value);
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    }).format(value);
+  } catch {
+    return `${currency} ${value.toLocaleString()}`;
+  }
 }
+
+export const INVOICE_STATUS_META: Record<
+  string,
+  { label: string; tone: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' }
+> = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  sent: { label: 'Awaiting payment', tone: 'warning' },
+  paid: { label: 'Paid', tone: 'success' },
+  cancelled: { label: 'Cancelled', tone: 'neutral' },
+  refunded: { label: 'Refunded', tone: 'danger' },
+};
+
+export const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  stripe: 'Card (Stripe)',
+  paystack: 'Card or transfer (Paystack)',
+  bank_transfer: 'Bank transfer',
+  other: 'Arranged with the studio',
+};
 
 export const initials = (name: string): string =>
   name

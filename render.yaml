@@ -1,0 +1,50 @@
+# Render blueprint. Push this repo, then: Render -> New -> Blueprint.
+# The disk is what makes SQLite and uploaded files survive a redeploy.
+services:
+  - type: web
+    name: designer-platform
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter          # a paid plan is required for a persistent disk
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: studio-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATA_DIR
+        value: /data/db
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: COOKIE_SECURE
+        value: 'true'
+      # Generated once by Render and then held steady.
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      # Set these in the dashboard after the first deploy, to your real domain.
+      - key: PUBLIC_SITE_URL
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Connectors — optional, add whichever you use.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

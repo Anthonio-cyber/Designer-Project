@@ -5,7 +5,6 @@ import { useSettings } from '@/context/SettingsContext';
 import { LinkButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icons';
 import { PortfolioCard, PortfolioCardSkeleton } from '@/components/PortfolioCard';
-import { formatMoney } from '@/lib/format';
 import type { PortfolioProject, Service } from '@/lib/types';
 import { useReveal } from '@/hooks/useReveal';
 
@@ -216,9 +215,7 @@ function ServicesPreview({ services }: { services: Service[] }) {
                 <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ink-muted">{service.description}</p>
               )}
               <div className="mt-4 flex items-center justify-between text-[13px]">
-                <span className="font-medium text-accent">
-                  {service.priceLabel ?? (service.priceFrom ? `From ${formatMoney(service.priceFrom)}` : 'Contact for pricing')}
-                </span>
+                <span className="font-medium text-accent">{service.priceDisplay}</span>
                 {service.deliveryTime && <span className="text-ink-faint">{service.deliveryTime}</span>}
               </div>
             </Link>

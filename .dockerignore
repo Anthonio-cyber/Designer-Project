@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+server/data
+server/uploads
+*.log
+.env
+.env.*
+!.env.example
+README.md
+DEPLOYMENT.md

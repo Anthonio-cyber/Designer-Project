@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { formatMoney } from '@/lib/format';
+import { useSettings } from '@/context/SettingsContext';
 import { LinkButton } from '@/components/ui/Button';
 import { EmptyState, Skeleton } from '@/components/ui/Primitives';
 import { Icon } from '@/components/ui/Icons';
@@ -9,6 +9,7 @@ import { useReveal } from '@/hooks/useReveal';
 import type { Service } from '@/lib/types';
 
 export default function Services() {
+  const { settings } = useSettings();
   const [services, setServices] = useState<Service[] | null>(null);
   const ref = useReveal();
 
@@ -27,9 +28,10 @@ export default function Services() {
           What I can design for you.
         </h1>
         <p className="mt-4 text-base leading-relaxed text-ink-muted">
-          Prices below are starting points for a typical scope. Send a brief and you will get a fixed quote before
-          any work begins — no hourly surprises.
+          Fixed prices are exactly that. Everything else is a starting point — send a brief and you will get a firm
+          quote before any work begins, with no hourly surprises.
         </p>
+        {settings?.paymentTerms && <p className="mt-3 text-sm text-ink-faint">{settings.paymentTerms}</p>}
       </header>
 
       <div ref={ref} className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -60,11 +62,15 @@ export default function Services() {
               )}
 
               <dl className="mt-5 space-y-2 border-t border-line pt-4 text-sm">
-                <div className="flex items-center justify-between">
-                  <dt className="text-ink-faint">Starting at</dt>
-                  <dd className="font-semibold text-ink">
-                    {service.priceLabel ?? formatMoney(service.priceFrom)}
-                  </dd>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-ink-faint">
+                    {service.priceMode === 'fixed'
+                      ? 'Price'
+                      : service.priceMode === 'from'
+                        ? 'Starting at'
+                        : 'Pricing'}
+                  </dt>
+                  <dd className="text-right font-semibold text-ink">{service.priceDisplay}</dd>
                 </div>
                 {service.deliveryTime && (
                   <div className="flex items-center justify-between">

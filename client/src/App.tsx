@@ -28,6 +28,8 @@ const ClientProjects = lazy(() => import('./pages/client/Projects'));
 const ClientProjectDetail = lazy(() => import('./pages/client/ProjectDetail'));
 const ClientRequests = lazy(() => import('./pages/client/Requests'));
 const ClientFiles = lazy(() => import('./pages/client/Files'));
+const ClientInvoices = lazy(() => import('./pages/client/Invoices'));
+const ClientInvoiceDetail = lazy(() => import('./pages/client/InvoiceDetail'));
 const ClientNotifications = lazy(() => import('./pages/client/Notifications'));
 const ClientProfile = lazy(() => import('./pages/client/Profile'));
 const ClientSettings = lazy(() => import('./pages/client/Settings'));
@@ -42,6 +44,8 @@ const AdminClientDetail = lazy(() => import('./pages/admin/ClientDetail'));
 const AdminMessages = lazy(() => import('./pages/admin/Messages'));
 const AdminRequests = lazy(() => import('./pages/admin/Requests'));
 const AdminRequestDetail = lazy(() => import('./pages/admin/RequestDetail'));
+const AdminInvoices = lazy(() => import('./pages/admin/Invoices'));
+const AdminConnectors = lazy(() => import('./pages/admin/Connectors'));
 const AdminFiles = lazy(() => import('./pages/admin/Files'));
 const AdminServices = lazy(() => import('./pages/admin/Services'));
 const AdminCategories = lazy(() => import('./pages/admin/Categories'));
@@ -93,6 +97,8 @@ export default function App() {
           <Route path="projects" element={<ClientProjects />} />
           <Route path="projects/:id" element={<ClientProjectDetail />} />
           <Route path="requests" element={<ClientRequests />} />
+          <Route path="invoices" element={<ClientInvoices />} />
+          <Route path="invoices/:id" element={<ClientInvoiceDetail />} />
           <Route path="files" element={<ClientFiles />} />
           <Route path="notifications" element={<ClientNotifications />} />
           <Route path="profile" element={<ClientProfile />} />
@@ -119,6 +125,8 @@ export default function App() {
           <Route path="messages" element={<AdminMessages />} />
           <Route path="requests" element={<AdminRequests />} />
           <Route path="requests/:id" element={<AdminRequestDetail />} />
+          <Route path="invoices" element={<AdminInvoices />} />
+          <Route path="connectors" element={<AdminConnectors />} />
           <Route path="files" element={<AdminFiles />} />
           <Route path="services" element={<AdminServices />} />
           <Route path="categories" element={<AdminCategories />} />

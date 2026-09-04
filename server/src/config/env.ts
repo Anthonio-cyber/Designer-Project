@@ -63,7 +63,32 @@ export const env = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
   aiModel: process.env.AI_MODEL ?? 'claude-sonnet-5',
   aiMaxTokens: int(process.env.AI_MAX_TOKENS, 2000),
+
+  // ---- Connectors -----------------------------------------------------------
+  // Every credential below is read here and nowhere else. None of them is ever
+  // written to the settings table or sent to the browser; the admin UI only
+  // ever learns whether a connector is configured, never its key.
+  resendApiKey: process.env.RESEND_API_KEY ?? '',
+  smtp: {
+    host: process.env.SMTP_HOST ?? '',
+    port: int(process.env.SMTP_PORT, 587),
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASSWORD ?? '',
+    secure: bool(process.env.SMTP_SECURE, false),
+  },
+
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+
+  paystackSecretKey: process.env.PAYSTACK_SECRET_KEY ?? '',
 };
+
+/** True when at least one outbound mail transport is usable. */
+export const emailConfigured = (): boolean =>
+  !!env.resendApiKey || (!!env.smtp.host && !!env.smtp.user);
+
+export const stripeConfigured = (): boolean => !!env.stripeSecretKey;
+export const paystackConfigured = (): boolean => !!env.paystackSecretKey;
 
 fs.mkdirSync(env.dataDir, { recursive: true });
 fs.mkdirSync(env.uploadDir, { recursive: true });

@@ -10,6 +10,7 @@ import { logActivity } from '../lib/activity.js';
 import { notify, notifyAdmins } from '../services/notifications.service.js';
 import { publicUrl } from '../services/storage.service.js';
 import { track } from '../services/analytics.service.js';
+import { adminRecipients, sendEmailAsync, templates } from '../services/email/index.js';
 
 export const projectsRouter = Router();
 projectsRouter.use(requireAuth);
@@ -279,6 +280,23 @@ projectsRouter.patch(
         body: input.statusNote ?? project.title as string,
         link: `/dashboard/projects/${id}`,
       });
+
+      const statusRecipient = db
+        .prepare(`SELECT email FROM users WHERE id = ?`)
+        .get(project.clientId) as { email: string } | undefined;
+      if (statusRecipient) {
+        sendEmailAsync({
+          to: statusRecipient.email,
+          template: 'project-status',
+          notifyKey: 'projectStatus',
+          email: templates.projectStatus({
+            title: project.title as string,
+            status: input.status as string,
+            note: input.statusNote,
+            projectId: id,
+          }),
+        });
+      }
       logActivity({
         actorId: req.auth!.id,
         actorType: 'admin',
@@ -338,6 +356,23 @@ projectsRouter.post(
       body: 'Approve it or request a revision from your project page.',
       link: `/dashboard/projects/${id}`,
     });
+
+    const deliveryRecipient = db
+      .prepare(`SELECT email FROM users WHERE id = ?`)
+      .get(project.clientId) as { email: string } | undefined;
+    if (deliveryRecipient) {
+      sendEmailAsync({
+        to: deliveryRecipient.email,
+        template: 'delivery-ready',
+        notifyKey: 'delivery',
+        email: templates.deliveryReady({
+          title: input.title,
+          version: nextVersion,
+          projectId: id,
+          note: input.note,
+        }),
+      });
+    }
     logActivity({
       actorId: req.auth!.id,
       actorType: 'admin',
@@ -442,6 +477,18 @@ projectsRouter.post(
       body: input.message.slice(0, 140),
       link: `/admin/projects/${project.id}`,
     });
+    for (const admin of adminRecipients()) {
+      sendEmailAsync({
+        to: admin.email,
+        template: 'revision-requested',
+        notifyKey: 'revision',
+        email: templates.revisionRequested({
+          clientName: req.auth!.name,
+          message: input.message,
+          projectId: project.id as string,
+        }),
+      });
+    }
     logActivity({
       actorId: req.auth!.id,
       actorType: 'client',

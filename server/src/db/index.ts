@@ -32,6 +32,9 @@ export function transaction<T>(fn: () => T): T {
 // their statements at import time, so the tables must exist before they do.
 migrate();
 
+// Column-level migrations live in a separate module to avoid an import cycle;
+// bootstrap runs them immediately after this module is first loaded.
+
 export type Row = Record<string, unknown>;
 
 export const now = (): string => new Date().toISOString().replace('T', ' ').slice(0, 19);

@@ -5,6 +5,7 @@ const ITEMS: NavItem[] = [
   { to: '/dashboard/messages', label: 'Messages', icon: 'chat', badge: 'messages' },
   { to: '/dashboard/projects', label: 'My Projects', icon: 'briefcase' },
   { to: '/dashboard/requests', label: 'Project Requests', icon: 'inbox' },
+  { to: '/dashboard/invoices', label: 'Invoices', icon: 'card' },
   { to: '/dashboard/files', label: 'Files', icon: 'file' },
   { to: '/dashboard/notifications', label: 'Notifications', icon: 'bell', badge: 'alerts' },
   { to: '/dashboard/profile', label: 'Profile', icon: 'user' },

@@ -22,6 +22,9 @@ import { aiRouter } from './routes/ai.routes.js';
 import { profileRouter, settingsRouter } from './routes/settings.routes.js';
 import { searchRouter } from './routes/search.routes.js';
 import { seoRouter } from './routes/seo.routes.js';
+import { invoicesRouter } from './routes/invoices.routes.js';
+import { paymentsRouter } from './routes/payments.routes.js';
+import { connectorsRouter } from './routes/connectors.routes.js';
 
 export function createApp() {
   const app = express();
@@ -52,6 +55,10 @@ export function createApp() {
     next();
   });
 
+  // Provider webhooks are mounted before the JSON parser: signature verification
+  // needs the exact bytes that were signed, not a re-serialised object.
+  app.use('/api/payments', paymentsRouter);
+
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
@@ -78,6 +85,8 @@ export function createApp() {
   app.use('/api/ai', aiRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/profile', profileRouter);
+  app.use('/api/invoices', invoicesRouter);
+  app.use('/api/connectors', connectorsRouter);
   app.use('/api/search', searchRouter);
   app.use(seoRouter);
 

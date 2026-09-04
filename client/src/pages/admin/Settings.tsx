@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { useSettings } from '@/context/SettingsContext';
@@ -9,7 +10,7 @@ import { Card, Skeleton, Tabs } from '@/components/ui/Primitives';
 import { ThemeSelector } from '@/components/ui/ThemeToggle';
 import { Icon } from '@/components/ui/Icons';
 
-type Tab = 'branding' | 'homepage' | 'about' | 'contact' | 'seo' | 'ai' | 'security';
+type Tab = 'branding' | 'homepage' | 'about' | 'contact' | 'payments' | 'email' | 'seo' | 'ai' | 'security';
 
 /** The full settings object as stored on the server. */
 interface AdminSettings {
@@ -47,6 +48,35 @@ interface AdminSettings {
   fileSettings: { maxUploadMb: number; allowedExtensions: string[] };
   clientSettings: { allowRegistration: boolean; autoCreateConversation: boolean };
   notificationSettings: { emailDigest: boolean; inApp: boolean };
+  email: {
+    enabled: boolean;
+    provider: 'auto' | 'resend' | 'smtp';
+    fromName: string;
+    fromEmail: string;
+    replyTo: string;
+    notify: Record<string, boolean>;
+  };
+  payments: {
+    enabled: boolean;
+    currency: string;
+    currencyMinorUnits: number;
+    stripeEnabled: boolean;
+    paystackEnabled: boolean;
+    bankTransferEnabled: boolean;
+    bank: {
+      accountName: string;
+      accountNumber: string;
+      bankName: string;
+      routingNumber: string;
+      iban: string;
+      swift: string;
+      instructions: string;
+    };
+    depositPercent: number;
+    paymentTerms: string;
+    invoiceFooter: string;
+    invoicePrefix: string;
+  };
 }
 
 export default function AdminSettings() {
@@ -111,6 +141,8 @@ export default function AdminSettings() {
           { value: 'homepage', label: 'Homepage' },
           { value: 'about', label: 'About' },
           { value: 'contact', label: 'Contact' },
+          { value: 'payments', label: 'Payments' },
+          { value: 'email', label: 'Email' },
           { value: 'seo', label: 'SEO' },
           { value: 'ai', label: 'AI' },
           { value: 'security', label: 'Clients & files' },
@@ -446,6 +478,337 @@ export default function AdminSettings() {
               blank={{ label: '', url: '' }}
               addLabel="Add link"
             />
+          </Card>
+        </div>
+      )}
+
+      {tab === 'payments' && (
+        <div className="space-y-6">
+          <Card>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-base font-semibold text-ink">Money</h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  How prices are shown and how clients pay you.
+                </p>
+              </div>
+              <Link
+                to="/admin/connectors"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+              >
+                Connector status
+                <Icon.arrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              <Field label="Currency" htmlFor="currency" hint="Three-letter code, e.g. USD, GBP, NGN.">
+                <Input
+                  id="currency"
+                  value={settings.payments.currency}
+                  onChange={(event) =>
+                    patch('payments', { ...settings.payments, currency: event.target.value.toUpperCase().slice(0, 3) })
+                  }
+                  maxLength={3}
+                />
+              </Field>
+              <Field label="Invoice prefix" htmlFor="invoicePrefix" hint="Numbers look like INV-2026-0001.">
+                <Input
+                  id="invoicePrefix"
+                  value={settings.payments.invoicePrefix}
+                  onChange={(event) => patch('payments', { ...settings.payments, invoicePrefix: event.target.value })}
+                  maxLength={8}
+                />
+              </Field>
+              <Field label="Default deposit %" htmlFor="deposit" hint="Used when you split a project fee.">
+                <Input
+                  id="deposit"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={settings.payments.depositPercent}
+                  onChange={(event) =>
+                    patch('payments', { ...settings.payments, depositPercent: Number(event.target.value) || 0 })
+                  }
+                />
+              </Field>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <Field label="Payment terms" htmlFor="terms" hint="Shown on the services page and on every invoice.">
+                <Input
+                  id="terms"
+                  value={settings.payments.paymentTerms}
+                  onChange={(event) => patch('payments', { ...settings.payments, paymentTerms: event.target.value })}
+                  maxLength={200}
+                />
+              </Field>
+              <Field label="Invoice footer" htmlFor="invoiceFooter">
+                <Input
+                  id="invoiceFooter"
+                  value={settings.payments.invoiceFooter}
+                  onChange={(event) => patch('payments', { ...settings.payments, invoiceFooter: event.target.value })}
+                  maxLength={200}
+                />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="font-display text-base font-semibold text-ink">How clients can pay</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              A method is only offered when it is switched on here <em>and</em> configured on the server.
+            </p>
+            <div className="mt-4 space-y-4">
+              <Checkbox
+                label="Card payment via Stripe"
+                description="Hosted checkout — card details never reach this site. Needs STRIPE_SECRET_KEY."
+                checked={settings.payments.stripeEnabled}
+                onChange={(event) =>
+                  patch('payments', { ...settings.payments, stripeEnabled: event.target.checked })
+                }
+              />
+              <Checkbox
+                label="Card & transfer via Paystack"
+                description="For Nigeria, Ghana, South Africa, Kenya and Egypt, where Stripe cannot pay out."
+                checked={settings.payments.paystackEnabled}
+                onChange={(event) =>
+                  patch('payments', { ...settings.payments, paystackEnabled: event.target.checked })
+                }
+              />
+              <Checkbox
+                label="Direct bank transfer"
+                description="No provider and no fees: your account details go on the invoice and you confirm receipt."
+                checked={settings.payments.bankTransferEnabled}
+                onChange={(event) =>
+                  patch('payments', { ...settings.payments, bankTransferEnabled: event.target.checked })
+                }
+              />
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="font-display text-base font-semibold text-ink">Your bank account</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Used for bank-transfer invoices and for custom-priced work. These details are shown only to the client
+              an invoice is addressed to — never on the public site.
+            </p>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Field label="Account name" htmlFor="accountName">
+                <Input
+                  id="accountName"
+                  value={settings.payments.bank.accountName}
+                  onChange={(event) =>
+                    patch('payments', {
+                      ...settings.payments,
+                      bank: { ...settings.payments.bank, accountName: event.target.value },
+                    })
+                  }
+                  placeholder="Amara Okoye Studio"
+                  maxLength={120}
+                />
+              </Field>
+              <Field label="Account number" htmlFor="accountNumber">
+                <Input
+                  id="accountNumber"
+                  value={settings.payments.bank.accountNumber}
+                  onChange={(event) =>
+                    patch('payments', {
+                      ...settings.payments,
+                      bank: { ...settings.payments.bank, accountNumber: event.target.value },
+                    })
+                  }
+                  placeholder="0123456789"
+                  maxLength={40}
+                  className="font-mono"
+                />
+              </Field>
+              <Field label="Bank name" htmlFor="bankName">
+                <Input
+                  id="bankName"
+                  value={settings.payments.bank.bankName}
+                  onChange={(event) =>
+                    patch('payments', {
+                      ...settings.payments,
+                      bank: { ...settings.payments.bank, bankName: event.target.value },
+                    })
+                  }
+                  maxLength={120}
+                />
+              </Field>
+              <Field label="Sort code / routing number" htmlFor="routingNumber">
+                <Input
+                  id="routingNumber"
+                  value={settings.payments.bank.routingNumber}
+                  onChange={(event) =>
+                    patch('payments', {
+                      ...settings.payments,
+                      bank: { ...settings.payments.bank, routingNumber: event.target.value },
+                    })
+                  }
+                  maxLength={40}
+                  className="font-mono"
+                />
+              </Field>
+              <Field label="IBAN" htmlFor="iban" hint="For international transfers. Leave blank if unused.">
+                <Input
+                  id="iban"
+                  value={settings.payments.bank.iban}
+                  onChange={(event) =>
+                    patch('payments', {
+                      ...settings.payments,
+                      bank: { ...settings.payments.bank, iban: event.target.value },
+                    })
+                  }
+                  maxLength={40}
+                  className="font-mono"
+                />
+              </Field>
+              <Field label="SWIFT / BIC" htmlFor="swift">
+                <Input
+                  id="swift"
+                  value={settings.payments.bank.swift}
+                  onChange={(event) =>
+                    patch('payments', {
+                      ...settings.payments,
+                      bank: { ...settings.payments.bank, swift: event.target.value },
+                    })
+                  }
+                  maxLength={20}
+                  className="font-mono"
+                />
+              </Field>
+            </div>
+
+            <Field
+              className="mt-4"
+              label="Transfer instructions"
+              htmlFor="bankInstructions"
+              hint="Shown under the account details on the invoice."
+            >
+              <Textarea
+                id="bankInstructions"
+                rows={2}
+                maxLength={400}
+                value={settings.payments.bank.instructions}
+                onChange={(event) =>
+                  patch('payments', {
+                    ...settings.payments,
+                    bank: { ...settings.payments.bank, instructions: event.target.value },
+                  })
+                }
+              />
+            </Field>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'email' && (
+        <div className="space-y-6">
+          <Card>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-base font-semibold text-ink">Sending</h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Who transactional email comes from. The API key lives in the server environment.
+                </p>
+              </div>
+              <Link
+                to="/admin/connectors"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+              >
+                Test & status
+                <Icon.arrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <Checkbox
+                label="Send transactional email"
+                description="Turn off to silence everything except password resets, which always send."
+                checked={settings.email.enabled}
+                onChange={(event) => patch('email', { ...settings.email, enabled: event.target.checked })}
+              />
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Transport" htmlFor="emailProvider" hint="Auto prefers Resend, then SMTP.">
+                  <Select
+                    id="emailProvider"
+                    value={settings.email.provider}
+                    onChange={(event) =>
+                      patch('email', {
+                        ...settings.email,
+                        provider: event.target.value as 'auto' | 'resend' | 'smtp',
+                      })
+                    }
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="resend">Resend only</option>
+                    <option value="smtp">SMTP only</option>
+                  </Select>
+                </Field>
+                <Field label="From name" htmlFor="fromName">
+                  <Input
+                    id="fromName"
+                    value={settings.email.fromName}
+                    onChange={(event) => patch('email', { ...settings.email, fromName: event.target.value })}
+                    maxLength={80}
+                  />
+                </Field>
+                <Field label="From address" htmlFor="fromEmail" hint="Must be on a domain you have verified.">
+                  <Input
+                    id="fromEmail"
+                    type="email"
+                    value={settings.email.fromEmail}
+                    onChange={(event) => patch('email', { ...settings.email, fromEmail: event.target.value })}
+                  />
+                </Field>
+              </div>
+              <Field label="Reply-to" htmlFor="replyTo" hint="Optional — where replies should land.">
+                <Input
+                  id="replyTo"
+                  type="email"
+                  value={settings.email.replyTo}
+                  onChange={(event) => patch('email', { ...settings.email, replyTo: event.target.value })}
+                />
+              </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="font-display text-base font-semibold text-ink">What triggers an email</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              In-app notifications are unaffected by these switches.
+            </p>
+            <div className="mt-4 space-y-3.5">
+              {[
+                ['welcome', 'Welcome email', 'Sent when a client creates an account.'],
+                ['newRequest', 'New project request', 'Emails you when a brief arrives from the website.'],
+                ['newMessage', 'New message', 'Emails the other side when a message is sent.'],
+                ['projectStatus', 'Project status change', 'Tells the client when a project moves stage.'],
+                ['delivery', 'Design delivered', 'Tells the client a design is ready to review.'],
+                ['revision', 'Revision requested', 'Emails you when a client sends a design back.'],
+                ['invoice', 'Invoices & payments', 'Invoice issued, and payment received confirmations.'],
+              ].map(([key, label, description]) => (
+                <Checkbox
+                  key={key}
+                  label={label}
+                  description={description}
+                  checked={settings.email.notify[key] ?? false}
+                  onChange={(event) =>
+                    patch('email', {
+                      ...settings.email,
+                      notify: { ...settings.email.notify, [key]: event.target.checked },
+                    })
+                  }
+                />
+              ))}
+            </div>
+
+            <p className="mt-5 rounded-xl bg-surface-sunken p-4 text-sm text-ink-muted">
+              Password reset email always sends, whatever these switches say — being locked out of your own account
+              is not an opt-in notification.
+            </p>
           </Card>
         </div>
       )}

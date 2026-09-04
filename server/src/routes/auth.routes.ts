@@ -15,6 +15,8 @@ import { env } from '../config/env.js';
 import { getSettings } from '../services/settings.service.js';
 import { publicUrl } from '../services/storage.service.js';
 import { ensureConversationForClient } from '../services/messaging.service.js';
+import { sendEmail, sendEmailAsync, templates } from '../services/email/index.js';
+import { emailConfigured } from '../config/env.js';
 
 export const authRouter = Router();
 
@@ -138,6 +140,8 @@ authRouter.post(
 
     if (getSettings().clientSettings.autoCreateConversation) ensureConversationForClient(id);
 
+    sendEmailAsync({ to: email, template: 'welcome', notifyKey: 'welcome', email: templates.welcome(name) });
+
     logActivity({ actorId: id, actorType: 'client', action: 'account.registered', entityType: 'user', entityId: id });
     startSession(res, req, { id, role: 'client', email, name });
     res.status(201).json({ user: serializeUser(id) });
@@ -256,9 +260,17 @@ authRouter.post(
       ).run(uuid(), user.id, hashToken(resetToken));
       logActivity({ actorId: user.id, actorType: 'system', action: 'account.password_reset_requested' });
 
-      // No mail transport is configured in this build; in development the token is
-      // returned so the flow is testable. In production it must be emailed.
-      if (env.isDev) response.devToken = resetToken;
+      // Reset mail ignores the per-event notification switches: locking someone
+      // out of their own account is never an opt-in notification.
+      await sendEmail({
+        to: email,
+        template: 'password-reset',
+        email: templates.passwordReset(resetToken),
+      });
+
+      // With no transport configured there is nowhere for the link to go, so in
+      // development it is returned to keep the flow testable. Never in production.
+      if (env.isDev && !emailConfigured()) response.devToken = resetToken;
     }
     res.json(response);
   }),

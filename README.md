@@ -24,6 +24,10 @@ npm run dev                 # http://localhost:5173
 The API runs on `:4000`; Vite proxies `/api` and `/socket.io` to it, so the browser
 sees a single origin in development exactly as it will in production.
 
+Every connector (email, payments, AI) is optional — the platform runs fully
+without any of them and degrades to something sensible. See
+[DEPLOYMENT.md](DEPLOYMENT.md) to switch them on.
+
 **Seeded accounts** (change them before deploying):
 
 | Role   | Email                     | Password        |
@@ -47,6 +51,15 @@ npm start          # one process serves the API and the built SPA on $PORT
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
+Or run the container, which does the build for you:
+
+```bash
+docker compose up --build
+```
+
+**[DEPLOYMENT.md](DEPLOYMENT.md)** covers Docker, Render (one-click blueprint),
+Fly.io and a plain VPS, plus how to wire up each connector.
+
 ---
 
 ## Architecture
@@ -61,7 +74,9 @@ designer-platform/
 │       ├── middleware/            auth (attach/require), central error handling
 │       ├── routes/                one router per domain
 │       ├── services/              settings, storage, messaging, analytics, notifications, features
-│       │   └── ai/                provider · studio context · tool registry · assistant
+│       │   ├── ai/                provider · studio context · tool registry · assistant
+│       │   ├── email/             transport (Resend / SMTP) · templates · send + log
+│       │   └── payments/          money · Stripe · Paystack · method registry
 │       └── realtime/              Socket.IO: rooms, presence, typing
 └── client/                        React 18 + Vite + TypeScript + Tailwind
     └── src/
@@ -133,6 +148,56 @@ client context. Analytics charts views, requests, message activity, completions,
 top projects, category performance and project stage mix, all dependency-free
 inline SVG.
 
+### Pricing, invoices and payments
+Every service carries one of three pricing modes, set from the admin with no
+code: a **fixed price** the studio can invoice immediately, a **starting-from**
+price for work that needs a quote, or a **custom quote** that shows "Contact for
+pricing" publicly. Invoices are raised against a client or project — picking a
+fixed-price service fills the amount in — then sent, paid and reconciled.
+
+Money is stored in minor units as integers, so no total is ever subject to
+floating-point drift, and zero-decimal currencies are handled correctly.
+
+Three ways to get paid, chosen per invoice:
+
+- **Stripe** — a hosted checkout page, so card details never touch this site and
+  the platform stays out of PCI scope.
+- **Paystack** — cards, transfer and USSD for Nigeria, Ghana, South Africa,
+  Kenya and Egypt, where Stripe cannot settle to a local account.
+- **Direct bank transfer** — no provider, no fees, no key. The studio's account
+  number goes on the invoice, visible only to the client it is addressed to, and
+  the designer confirms receipt with one click.
+
+Provider webhooks are the only public write endpoints in the app. Each verifies
+its signature against the raw request body before reading anything from the
+payload, and every accepted event id is stored behind a unique index, so a
+forged call cannot mark an invoice paid and a replay is a no-op.
+
+### Connectors
+`Admin → Connectors` is the single place to see what the platform is wired up
+to: what is configured, what is switched on, which environment variables each
+one reads, where to get a key, and the webhook URLs to paste into a provider
+dashboard. Email and payment credentials can be tested from the page — a real
+message is sent and a real session created, so "configured" means proven rather
+than assumed.
+
+The screen reports booleans and variable *names* only. No key, or any prefix of
+one, ever leaves the server.
+
+### Transactional email
+Welcome, password reset, new project request, new message, project status
+change, design delivered, revision requested, invoice issued and payment
+received — all as one inline-styled, single-column template that survives real
+mail clients. **Resend** is the recommended transport (one key, nothing to run,
+domain authentication that keeps mail out of spam); any **SMTP** server works as
+an alternative. With neither configured, messages are recorded in `email_log` as
+`skipped` and nothing breaks.
+
+Sending never blocks the request that triggered it: a mail outage cannot fail a
+sign-up or a message. Per-event switches live in `Admin → Settings → Email`, and
+password reset ignores them — being locked out of your own account is not an
+opt-in notification.
+
 ### Designer's AI
 An admin-only assistant that knows the studio: portfolio counts, categories, most
 viewed work, services, homepage sections and installed features. It drafts client
@@ -195,6 +260,12 @@ expands without a rebuild.
 - **Zod validation** on every request body and query; all SQL uses bound parameters.
 - **Rate limiting** per endpoint (login, registration, password reset, requests,
   uploads, messaging, AI) with a global ceiling on top.
+- **Signed webhooks**: raw-body signature verification (Stripe's scheme, and
+  Paystack's HMAC-SHA512 compared in constant time) plus replay protection via a
+  unique index on every processed event id.
+- **Credentials stay server-side**: mail, payment and AI keys are read from the
+  environment in one module, never written to the settings table, never returned
+  by an API and never sent to the browser.
 - Security headers, a strict CORS allow-list, and an append-only audit log.
 
 Password reset has no mail transport wired up: in development the token is
@@ -236,11 +307,18 @@ are applied before first paint and remembered per browser.
 | `npm start`            | Serve API + built client from one process     |
 | `npm run seed`         | Add demo content (`-- --reset` rebuilds it)   |
 | `npm run typecheck`    | TypeScript across both workspaces             |
+| `docker compose up`    | Run the production image locally              |
 
 ## Deploying
 
-`npm run build && npm start` behind a TLS terminator. Set `COOKIE_SECURE=true`,
-`PUBLIC_SITE_URL` and `CLIENT_ORIGIN` to the real domain, and keep `server/data`
-and `server/uploads` on a persistent volume — those hold the database and every
-uploaded file. Swapping local disk for S3-compatible storage means reimplementing
-only `server/src/services/storage.service.ts`.
+One process serves the API and the built client, so there is no separate
+frontend host. `Dockerfile`, `docker-compose.yml`, `render.yaml` and `fly.toml`
+are all in the repository, and CI typechecks, builds, boots the server and
+builds the image on every push.
+
+Keep `server/data` and `server/uploads` (or `/data` in the container) on a
+persistent volume — they hold the database and every uploaded file.
+
+**Read [DEPLOYMENT.md](DEPLOYMENT.md)** for the full walkthrough: the pre-launch
+checklist, all four hosting paths, connector setup, backups, health checks and
+what to change first when the studio outgrows a single box.

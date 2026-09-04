@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck both workspaces
+        run: npm run typecheck
+      - name: Build API and client
+        run: npm run build
+      - name: Boot the server and check /api/health
+        env:
+          NODE_ENV: production
+          PORT: 4000
+          JWT_ACCESS_SECRET: ci-only-access-secret-not-a-real-one
+          JWT_REFRESH_SECRET: ci-only-refresh-secret-not-a-real-one
+        run: |
+          node server/dist/index.js &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4000/api/health && exit 0
+            sleep 1
+          done
+          echo "server did not become healthy" && exit 1
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t designer-platform:ci .

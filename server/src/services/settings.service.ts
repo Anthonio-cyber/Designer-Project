@@ -35,6 +35,53 @@ export interface SiteSettings {
   fileSettings: { maxUploadMb: number; allowedExtensions: string[] };
   clientSettings: { allowRegistration: boolean; autoCreateConversation: boolean };
   notificationSettings: { emailDigest: boolean; inApp: boolean };
+  email: EmailSettings;
+  payments: PaymentSettings;
+}
+
+export interface EmailSettings {
+  enabled: boolean;
+  /** Which transport to try first. Falls back to the other if it is unconfigured. */
+  provider: 'auto' | 'resend' | 'smtp';
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  /** Per-event switches. Password reset ignores these — it is always delivered. */
+  notify: {
+    welcome: boolean;
+    newRequest: boolean;
+    newMessage: boolean;
+    projectStatus: boolean;
+    delivery: boolean;
+    revision: boolean;
+    invoice: boolean;
+  };
+}
+
+export interface BankDetails {
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  /** Sort code / routing number / IFSC — labelled per region by the admin. */
+  routingNumber: string;
+  iban: string;
+  swift: string;
+  instructions: string;
+}
+
+export interface PaymentSettings {
+  enabled: boolean;
+  currency: string;
+  /** Minor units per major unit: 100 for USD/NGN/GBP, 1 for JPY. */
+  currencyMinorUnits: number;
+  stripeEnabled: boolean;
+  paystackEnabled: boolean;
+  bankTransferEnabled: boolean;
+  bank: BankDetails;
+  depositPercent: number;
+  paymentTerms: string;
+  invoiceFooter: string;
+  invoicePrefix: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
@@ -117,6 +164,43 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   },
   clientSettings: { allowRegistration: true, autoCreateConversation: true },
   notificationSettings: { emailDigest: false, inApp: true },
+  email: {
+    enabled: true,
+    provider: 'auto',
+    fromName: 'Amara Okoye',
+    fromEmail: 'hello@amara.studio',
+    replyTo: '',
+    notify: {
+      welcome: true,
+      newRequest: true,
+      newMessage: true,
+      projectStatus: true,
+      delivery: true,
+      revision: true,
+      invoice: true,
+    },
+  },
+  payments: {
+    enabled: true,
+    currency: 'USD',
+    currencyMinorUnits: 100,
+    stripeEnabled: true,
+    paystackEnabled: false,
+    bankTransferEnabled: true,
+    bank: {
+      accountName: '',
+      accountNumber: '',
+      bankName: '',
+      routingNumber: '',
+      iban: '',
+      swift: '',
+      instructions: 'Please use the invoice number as the payment reference.',
+    },
+    depositPercent: 50,
+    paymentTerms: '50% to start, 50% on delivery of final files.',
+    invoiceFooter: 'Thank you for working with the studio.',
+    invoicePrefix: 'INV',
+  },
 };
 
 const SETTINGS_KEY = 'site';
@@ -179,5 +263,11 @@ export function getPublicSettings() {
     allowRegistration: s.clientSettings.allowRegistration,
     maxUploadMb: s.fileSettings.maxUploadMb,
     allowedExtensions: s.fileSettings.allowedExtensions,
+    // Public visitors see the currency and terms so prices read correctly, but
+    // never the studio's bank account — those reach signed-in clients only, on
+    // an invoice addressed to them.
+    currency: s.payments.currency,
+    currencyMinorUnits: s.payments.currencyMinorUnits,
+    paymentTerms: s.payments.paymentTerms,
   };
 }

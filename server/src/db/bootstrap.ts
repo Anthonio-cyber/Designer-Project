@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import { db } from './index.js';
+import { runColumnMigrations } from './migrations.js';
 import { uuid } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
 import { CORE_FEATURES, getFeature } from '../services/features.service.js';
@@ -20,15 +21,15 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const DEFAULT_SERVICES = [
-  { name: 'Logo Design', description: 'A single distinctive mark with the full file set: vector, colour variants and clear-space rules.', priceFrom: 350, deliveryTime: '5–7 days', icon: 'pen' },
-  { name: 'Brand Identity', description: 'The complete system — logo, palette, typography, layout rules and a guidelines document your team can actually follow.', priceFrom: 1200, deliveryTime: '3–4 weeks', icon: 'sparkles' },
-  { name: 'Poster Design', description: 'Event and campaign posters built for print and screen, supplied press-ready.', priceFrom: 180, deliveryTime: '3–5 days', icon: 'image' },
-  { name: 'Flyer Design', description: 'Single or double-sided flyers with a clear hierarchy that survives being read in three seconds.', priceFrom: 120, deliveryTime: '2–4 days', icon: 'file' },
-  { name: 'Social Media Graphics', description: 'A month of on-brand posts and stories, sized for every platform.', priceFrom: 300, deliveryTime: '5–7 days', icon: 'share' },
-  { name: 'Business Card Design', description: 'Cards designed with the printer in mind: bleed, stock and finish decided up front.', priceFrom: 120, deliveryTime: '2–3 days', icon: 'card' },
-  { name: 'YouTube Thumbnail Design', description: 'Thumbnails built to be legible at 120px wide, in a template you can reuse.', priceFrom: 60, deliveryTime: '1–2 days', icon: 'play' },
-  { name: 'UI/UX Design', description: 'Product and marketing interfaces — flows, wireframes and a component library handed off in Figma.', priceFrom: 1500, deliveryTime: '3–6 weeks', icon: 'layout' },
-  { name: 'Advertising Design', description: 'Display, print and out-of-home creative adapted across every placement you need.', priceFrom: 450, deliveryTime: '1–2 weeks', icon: 'megaphone' },
+  { name: 'Logo Design', description: 'A single distinctive mark with the full file set: vector, colour variants and clear-space rules.', priceMode: 'fixed', price: 350, deliveryTime: '5–7 days', icon: 'pen' },
+  { name: 'Brand Identity', description: 'The complete system — logo, palette, typography, layout rules and a guidelines document your team can actually follow.', priceMode: 'from', price: 1200, deliveryTime: '3–4 weeks', icon: 'sparkles' },
+  { name: 'Poster Design', description: 'Event and campaign posters built for print and screen, supplied press-ready.', priceMode: 'fixed', price: 180, deliveryTime: '3–5 days', icon: 'image' },
+  { name: 'Flyer Design', description: 'Single or double-sided flyers with a clear hierarchy that survives being read in three seconds.', priceMode: 'fixed', price: 120, deliveryTime: '2–4 days', icon: 'file' },
+  { name: 'Social Media Graphics', description: 'A month of on-brand posts and stories, sized for every platform.', priceMode: 'fixed', price: 300, deliveryTime: '5–7 days', icon: 'share' },
+  { name: 'Business Card Design', description: 'Cards designed with the printer in mind: bleed, stock and finish decided up front.', priceMode: 'fixed', price: 120, deliveryTime: '2–3 days', icon: 'card' },
+  { name: 'YouTube Thumbnail Design', description: 'Thumbnails built to be legible at 120px wide, in a template you can reuse.', priceMode: 'fixed', price: 60, deliveryTime: '1–2 days', icon: 'play' },
+  { name: 'UI/UX Design', description: 'Product and marketing interfaces — flows, wireframes and a component library handed off in Figma.', priceMode: 'from', price: 1500, deliveryTime: '3–6 weeks', icon: 'layout' },
+  { name: 'Advertising Design', description: 'Display, print and out-of-home creative adapted across every placement you need.', priceMode: 'custom', price: null, deliveryTime: '1–2 weeks', icon: 'megaphone' },
 ];
 
 /**
@@ -37,6 +38,8 @@ const DEFAULT_SERVICES = [
  * every boot — it only fills in what is missing.
  */
 export function ensureBootstrapData(): void {
+  runColumnMigrations();
+
   const adminCount = db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`).get() as { n: number };
 
   if (adminCount.n === 0) {
@@ -72,8 +75,9 @@ export function ensureBootstrapData(): void {
   const serviceCount = db.prepare(`SELECT COUNT(*) AS n FROM services`).get() as { n: number };
   if (serviceCount.n === 0) {
     const insert = db.prepare(
-      `INSERT INTO services (id, name, slug, description, price_from, delivery_time, icon, position)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO services (id, name, slug, description, price_mode, price_fixed, price_from,
+                             delivery_time, icon, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     db.transaction(() => {
       DEFAULT_SERVICES.forEach((service, index) => {
@@ -82,7 +86,9 @@ export function ensureBootstrapData(): void {
           service.name,
           service.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           service.description,
-          service.priceFrom,
+          service.priceMode,
+          service.priceMode === 'fixed' ? service.price : null,
+          service.priceMode === 'from' ? service.price : null,
           service.deliveryTime,
           service.icon,
           index,

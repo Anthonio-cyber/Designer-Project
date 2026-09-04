@@ -13,6 +13,8 @@ import { notify, notifyAdmins } from '../services/notifications.service.js';
 import { emitToAdmins, emitToConversation, emitToUser, isOnline } from '../realtime/index.js';
 import { publicUrl, recordFile, upload } from '../services/storage.service.js';
 import { track } from '../services/analytics.service.js';
+import { adminRecipients, sendEmailAsync, templates } from '../services/email/index.js';
+import { db as database } from '../db/index.js';
 
 export const messagesRouter = Router();
 messagesRouter.use(requireAuth);
@@ -261,6 +263,14 @@ messagesRouter.post(
         link: `/admin/messages?conversation=${conversation.id}`,
       });
       emitToAdmins('message:new', payload);
+      for (const admin of adminRecipients()) {
+        sendEmailAsync({
+          to: admin.email,
+          template: 'new-message-admin',
+          notifyKey: 'newMessage',
+          email: templates.newMessage({ fromName: viewer.name, preview: body.slice(0, 200), toAdmin: true }),
+        });
+      }
     } else {
       notify({
         userId: conversation.client_id,
@@ -270,6 +280,18 @@ messagesRouter.post(
         link: '/dashboard/messages',
       });
       emitToUser(conversation.client_id, 'message:new', payload);
+
+      const client = database
+        .prepare(`SELECT email FROM users WHERE id = ?`)
+        .get(conversation.client_id) as { email: string } | undefined;
+      if (client) {
+        sendEmailAsync({
+          to: client.email,
+          template: 'new-message-client',
+          notifyKey: 'newMessage',
+          email: templates.newMessage({ fromName: viewer.name, preview: body.slice(0, 200), toAdmin: false }),
+        });
+      }
     }
 
     res.status(201).json({ message: payload });

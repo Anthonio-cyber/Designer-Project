@@ -52,17 +52,115 @@ export interface PortfolioProject {
   raw?: { thumbnail: string | null; mainImage: string | null; gallery: string[] };
 }
 
+export type PriceMode = 'fixed' | 'from' | 'custom';
+
 export interface Service {
   id: string;
   name: string;
   slug: string;
   description: string | null;
+  priceMode: PriceMode;
+  priceFixed: number | null;
   priceFrom: number | null;
   priceLabel: string | null;
+  currency: string;
+  /** Server-rendered price string — "$350.00", "From $1,200.00" or "Contact for pricing". */
+  priceDisplay: string;
+  /** True when the price is fixed, so the studio can invoice without quoting. */
+  payableNow: boolean;
   deliveryTime: string | null;
   icon: string | null;
   position: number;
   active: boolean;
+}
+
+export type PaymentMethod = 'stripe' | 'paystack' | 'bank_transfer' | 'other';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled' | 'refunded';
+
+export interface BankDetails {
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  routingNumber: string;
+  iban: string;
+  swift: string;
+  instructions: string;
+}
+
+export interface Invoice {
+  id: string;
+  number: string;
+  clientId: string;
+  clientName: string;
+  clientEmail: string;
+  projectId: string | null;
+  projectTitle: string | null;
+  projectCode: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
+  title: string;
+  description: string | null;
+  amountMinor: number;
+  amountMajor: number;
+  amount: string;
+  currency: string;
+  method: PaymentMethod;
+  status: InvoiceStatus;
+  dueDate: string | null;
+  notes: string | null;
+  checkoutUrl: string | null;
+  providerRef: string | null;
+  paidAt: string | null;
+  paidMethod: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Present only on an invoice settled by transfer, for its own client. */
+  bank: BankDetails | null;
+  paymentTerms: string;
+  invoiceFooter: string;
+}
+
+export interface PaymentMethodStatus {
+  method: PaymentMethod;
+  label: string;
+  enabled: boolean;
+  configured: boolean;
+  testMode: boolean;
+  hint: string;
+}
+
+export interface Connector {
+  key: string;
+  name: string;
+  category: 'email' | 'payments' | 'ai';
+  configured: boolean;
+  enabled: boolean;
+  recommended: boolean;
+  testMode: boolean;
+  summary: string;
+  /** Variable names only — the server never returns a key or any part of one. */
+  envVars: string[];
+  setupUrl: string;
+  notes: string[];
+}
+
+export interface ConnectorsResponse {
+  connectors: Connector[];
+  email: { activeProvider: 'resend' | 'smtp' | 'none'; configured: boolean; from: string };
+  payments: { methods: PaymentMethodStatus[]; currency: string };
+  webhookUrls: { stripe: string; paystack: string };
+}
+
+export interface EmailLogEntry {
+  id: string;
+  toEmail: string;
+  subject: string;
+  template: string;
+  provider: string;
+  status: 'sent' | 'failed' | 'skipped';
+  error: string | null;
+  createdAt: string;
 }
 
 export interface AttachedFile {
@@ -261,6 +359,9 @@ export interface PublicSettings {
   allowRegistration: boolean;
   maxUploadMb: number;
   allowedExtensions: string[];
+  currency: string;
+  currencyMinorUnits: number;
+  paymentTerms: string;
 }
 
 export interface ActivityEntry {
