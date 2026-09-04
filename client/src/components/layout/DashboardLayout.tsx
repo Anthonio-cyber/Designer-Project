@@ -39,6 +39,16 @@ export function DashboardLayout({ items, title, homeHref, variant, footer }: Das
   const badgeFor = (item: NavItem): number =>
     item.badge === 'messages' ? unreadMessages : item.badge === 'alerts' ? unread : 0;
 
+  // The header bar and the page body share one container, so the search field,
+  // notification bell and theme toggle stay aligned with the content beneath
+  // them instead of drifting to the window edge on a wide screen.
+  // Admin runs wide (three-pane messaging, dense tables); the client dashboard
+  // stays narrower so text lines remain comfortable to read.
+  const container = cn(
+    'mx-auto w-full px-4 sm:px-6 lg:px-8',
+    variant === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl',
+  );
+
   const sidebar = (
     <div className="flex h-full flex-col">
       <Link to="/" className="flex items-center gap-2.5 px-5 py-5">
@@ -128,7 +138,7 @@ export function DashboardLayout({ items, title, homeHref, variant, footer }: Das
 
       <div className="lg:pl-[264px]">
         <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-xl">
-          <div className="flex h-16 items-center gap-2 px-4 sm:px-6">
+          <div className={cn('flex h-16 items-center gap-2', container)}>
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
@@ -155,10 +165,8 @@ export function DashboardLayout({ items, title, homeHref, variant, footer }: Das
           </div>
         </header>
 
-        <main className={cn('px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-12', variant === 'client' && 'pb-28')}>
-          {/* The admin runs wide (three-pane messaging, dense tables); the client
-              dashboard stays narrower so text lines remain comfortable. */}
-          <div className={cn('mx-auto', variant === 'admin' ? 'max-w-[1440px]' : 'max-w-6xl')}>
+        <main className={cn('pb-24 pt-6 lg:pb-12', variant === 'client' && 'pb-28')}>
+          <div className={container}>
             <Outlet />
           </div>
         </main>
